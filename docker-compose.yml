@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: uber_clone_mongodb
+    environment:
+      MONGO_INITDB_DATABASE: uber_clone
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - uber_network
+    restart: unless-stopped
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: uber_clone_backend
+    environment:
+      PORT: 3000
+      DB_CONNECT: mongodb://mongodb:27017/uber_clone
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key_change_this}
+      GOOGLE_MAPS_API: ${GOOGLE_MAPS_API:-your_google_maps_api_key}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongodb
+    networks:
+      - uber_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: uber_clone_frontend
+    environment:
+      VITE_API_BASE_URL: http://backend:3000
+      VITE_SOCKET_URL: http://backend:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - uber_network
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+
+networks:
+  uber_network:
+    driver: bridge
